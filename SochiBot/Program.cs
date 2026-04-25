@@ -32,13 +32,13 @@ bot.StartReceiving(
             if (text == "/start")
             {
                 db.AddUser(chatId);
-                await botClient.SendTextMessageAsync(chatId, "Ты подписан на уведомления ЖКХ ✅");
+                await botClient.SendMessage(chatId, "Ты подписан на уведомления ЖКХ ✅");
             }
 
             if (text == "/stop")
             {
                 db.RemoveUser(chatId);
-                await botClient.SendTextMessageAsync(chatId, "Ты отписался ❌");
+                await botClient.SendMessage(chatId, "Ты отписался ❌");
             }
         }
     },
@@ -69,7 +69,7 @@ _ = Task.Run(async () =>
 
             foreach (var user in db.GetUsers())
             {
-                await bot.SendTextMessageAsync(user, post.Text);
+                await bot.SendMessage(user, post.Text);
             }
         }
 

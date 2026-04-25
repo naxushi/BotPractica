@@ -1,24 +1,27 @@
-﻿using System.Net.Http;
+using System.Text.Json;
 
 public static class Parser
 {
-    public static async Task<List<string>> Parse(string url)
+    public static async Task<List<Post>> GetPosts()
     {
-        var list = new List<string>();
+        var list = new List<Post>();
 
-        try
+        using var http = new HttpClient();
+
+        var json = await http.GetStringAsync("https://api.rss2json.com/v1/api.json?rss_url=https://t.me/s/sochi_live");
+
+        var doc = JsonDocument.Parse(json);
+
+        foreach (var item in doc.RootElement.GetProperty("items").EnumerateArray())
         {
-            var http = new HttpClient();
-            var html = await http.GetStringAsync(url);
+            var text = item.GetProperty("title").GetString();
 
-            var parts = html.Split("tgme_widget_message_text");
-
-            foreach (var p in parts.Skip(1).Take(1))
+            list.Add(new Post
             {
-                list.Add("Новость из канала:\n" + url);
-            }
+                Id = text,
+                Text = text
+            });
         }
-        catch { }
 
         return list;
     }

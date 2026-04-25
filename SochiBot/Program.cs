@@ -6,6 +6,12 @@ using Telegram.Bot.Types.Enums;
 SQLitePCL.Batteries.Init();
 
 var token = Environment.GetEnvironmentVariable("BOT_TOKEN");
+
+if (string.IsNullOrEmpty(token))
+{
+    Console.WriteLine("TOKEN NOT FOUND");
+    return;
+}
 var bot = new TelegramBotClient(token);
 
 var db = new Db();

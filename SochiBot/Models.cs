@@ -1,5 +1,5 @@
-﻿public class Source
+public class Post
 {
-    public string Channel { get; set; }
-    public string Category { get; set; }
+    public string Id { get; set; }
+    public string Text { get; set; }
 }

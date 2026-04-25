@@ -3,6 +3,13 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+app.MapGet("/", () => "Bot is running");
+
+app.RunAsync();
+
 SQLitePCL.Batteries.Init();
 
 var token = Environment.GetEnvironmentVariable("BOT_TOKEN");

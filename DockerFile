@@ -5,4 +5,4 @@ COPY . .
 
 RUN dotnet publish -c Release -o out
 
-CMD ["dotnet", "out/SochiBot.dll"]
+CMD ["dotnet", "out/Bot.dll"]

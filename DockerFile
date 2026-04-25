@@ -3,6 +3,6 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0
 WORKDIR /app
 COPY . .
 
-RUN dotnet publish -c Release -o out
+RUN dotnet publish SochiBot.csproj -c Release -o out
 
-CMD ["dotnet", "out/Bot.dll"]
+CMD ["dotnet", "out/SochiBot.dll"]

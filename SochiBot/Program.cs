@@ -48,6 +48,7 @@ bot.StartReceiving(
 
 Console.WriteLine("Бот запущен");
 
+
 _ = Task.Run(async () =>
 {
     while (true)
@@ -72,3 +73,8 @@ _ = Task.Run(async () =>
 });
 
 Console.ReadLine();
+<<<<<<< Updated upstream
+=======
+
+await Task.Delay(-1);
+>>>>>>> Stashed changes

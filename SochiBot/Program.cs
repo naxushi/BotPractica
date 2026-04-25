@@ -5,7 +5,7 @@ using Telegram.Bot.Types.Enums;
 
 SQLitePCL.Batteries.Init();
 
-var token = Environment.GetEnvironmentVariable("8372858786:AAEL5FwcINVGxEUPNxStyLruA1w0JEvntuI"); 
+var token = Environment.GetEnvironmentVariable("BOT_TOKEN"); 
 var bot = new TelegramBotClient(token);
 
 var db = new Db("Data Source=sochi.db");

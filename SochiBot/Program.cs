@@ -1,70 +1,69 @@
-﻿using Telegram.Bot;
+using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
 SQLitePCL.Batteries.Init();
 
-var token = Environment.GetEnvironmentVariable("BOT_TOKEN"); 
+var token = Environment.GetEnvironmentVariable("BOT_TOKEN");
 var bot = new TelegramBotClient(token);
 
-var db = new Db("Data Source=sochi.db");
-db.Init();
+var db = new Db();
+DbInitializer.Init(db);
+
+Console.WriteLine("Бот запущен");
 
 var cts = new CancellationTokenSource();
 
 bot.StartReceiving(
     async (botClient, update, ct) =>
     {
-        if (update.Message is not { Text: { } text }) return;
+        if (update.Type == UpdateType.Message && update.Message.Text != null)
+        {
+            var chatId = update.Message.Chat.Id;
+            var text = update.Message.Text;
 
-        var userId = update.Message.Chat.Id;
+            if (text == "/start")
+            {
+                db.AddUser(chatId);
+                await botClient.SendTextMessageAsync(chatId, "Ты подписан на уведомления ЖКХ ✅");
+            }
 
-        if (text == "/start")
-        {
-            db.AddUser(userId);
-            await botClient.SendMessage(userId, "Ты подписан ✅");
-        }
-        else if (text.StartsWith("/add "))
-        {
-            var url = text.Replace("/add ", "");
-            db.AddSource(url, "user");
-            await botClient.SendMessage(userId, "Источник добавлен");
-        }
-        else if (text == "/list")
-        {
-            var sources = db.GetSources();
-            var msg = string.Join("\n", sources.Select(s => s.Channel));
-            await botClient.SendMessage(userId, msg);
+            if (text == "/stop")
+            {
+                db.RemoveUser(chatId);
+                await botClient.SendTextMessageAsync(chatId, "Ты отписался ❌");
+            }
         }
     },
-    (botClient, ex, ct) =>
+    async (botClient, exception, ct) =>
     {
-        Console.WriteLine(ex.Message);
-        return Task.CompletedTask;
+        Console.WriteLine(exception.Message);
     },
+    new ReceiverOptions { AllowedUpdates = { } },
     cancellationToken: cts.Token
 );
 
-Console.WriteLine("Бот запущен");
-
-
+// запуск парсера
 _ = Task.Run(async () =>
 {
     while (true)
     {
-        var sources = db.GetSources();
+        var posts = await Parser.GetPosts();
 
-        foreach (var s in sources)
+        foreach (var post in posts)
         {
-            var posts = await Parser.Parse(s.Channel);
+            if (!Filter.IsRelevant(post))
+                continue;
 
-            foreach (var post in posts)
+            if (DbInitializer.IsDuplicate(post.Id))
+                continue;
+
+            DbInitializer.SavePost(post.Id);
+
+            foreach (var user in db.GetUsers())
             {
-                foreach (var user in db.GetUsers())
-                {
-                    await bot.SendMessage(user, post);
-                }
+                await bot.SendTextMessageAsync(user, post.Text);
             }
         }
 
@@ -72,9 +71,4 @@ _ = Task.Run(async () =>
     }
 });
 
-Console.ReadLine();
-<<<<<<< Updated upstream
-=======
-
 await Task.Delay(-1);
->>>>>>> Stashed changes

@@ -73,8 +73,5 @@ _ = Task.Run(async () =>
 });
 
 Console.ReadLine();
-<<<<<<< Updated upstream
-=======
-
 await Task.Delay(-1);
->>>>>>> Stashed changes
+

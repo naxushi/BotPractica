@@ -18,11 +18,11 @@ var bot = new TelegramBotClient(token);
 
 // ===== данные пользователей
 var users = new Dictionary<long, string>(); // режим
-var userSources = new Dictionary<long, List<string>>(
+var userSources = new Dictionary<long, List<string>{
     "https://rosseti-kuban.ru/potrebitelyam/tekhnicheskoe-sostoyanie-setey/planovye-otklyucheniya/",
     "https://sochi.com/news/2107/",
     "https://t.me/mimimiandmanimo" 
-); // источники
+    }; // источники
 
 var http = new HttpClient();
 var lastData = new Dictionary<string, string>(); // анти-дубли

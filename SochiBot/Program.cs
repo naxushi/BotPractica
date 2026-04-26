@@ -3,53 +3,49 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
-var builder = WebApplication.CreateBuilder(args);
-var app = builder.Build();
+var botToken = Environment.GetEnvironmentVariable("BOT_TOKEN");
 
-app.MapGet("/", () => "Bot is running");
-app.RunAsync(); // важно
-
-var token = Environment.GetEnvironmentVariable("BOT_TOKEN");
-
-if (string.IsNullOrEmpty(token))
+if (string.IsNullOrEmpty(botToken))
 {
-    Console.WriteLine("TOKEN NOT FOUND");
+    Console.WriteLine("Token not found");
     return;
 }
 
-var bot = new TelegramBotClient(token);
+var botClient = new TelegramBotClient(botToken);
 
 using var cts = new CancellationTokenSource();
 
-bot.StartReceiving(
-    async (botClient, update, ct) =>
-    {
-        if (update.Type != UpdateType.Message || update.Message!.Text == null)
-            return;
+var receiverOptions = new ReceiverOptions
+{
+    AllowedUpdates = Array.Empty<UpdateType>()
+};
 
-        var chatId = update.Message.Chat.Id;
-        var text = update.Message.Text;
-
-        if (text == "/start")
-        {
-            await botClient.SendMessage(chatId, "Бот работает ✅");
-        }
-        else if (text == "/help")
-        {
-            await botClient.SendMessage(chatId, "/start - запуск\n/help - помощь");
-        }
-        else
-        {
-            await botClient.SendMessage(chatId, "Не понимаю команду");
-        }
-    },
-    async (botClient, exception, ct) =>
-    {
-        Console.WriteLine(exception.Message);
-    },
+botClient.StartReceiving(
+    HandleUpdateAsync,
+    HandleErrorAsync,
+    receiverOptions,
     cancellationToken: cts.Token
 );
 
-Console.WriteLine("Bot started");
+Console.WriteLine("Бот запущен");
 
 await Task.Delay(-1);
+
+async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
+{
+    if (update.Message is { Text: { } messageText })
+    {
+        var chatId = update.Message.Chat.Id;
+
+        if (messageText == "/start")
+        {
+            await bot.SendMessage(chatId, "Бот работает");
+        }
+    }
+}
+
+Task HandleErrorAsync(ITelegramBotClient bot, Exception exception, CancellationToken ct)
+{
+    Console.WriteLine(exception.Message);
+    return Task.CompletedTask;
+}

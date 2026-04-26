@@ -77,7 +77,8 @@ _ = Task.Run(async () =>
                             continue;
 
                         await bot.SendTextMessageAsync(id,
-                            "🌐 Обновление с сайта:\n\n" +
+                            "🌐 <b>Новое обновление с сайта</b>\n\n" +
+                            "📄 Краткое содержание:\n" +
                             html.Substring(0, Math.Min(500, html.Length)));
                     }
                 }
@@ -120,7 +121,8 @@ async Task HandleUpdate(ITelegramBotClient bot, Update update, CancellationToken
                 continue;
 
             await bot.SendTextMessageAsync(user.Key,
-                "📢 Канал:\n\n" + text);
+                "📢 <b>Новое сообщение из канала</b>\n\n" +
+                text);
         }
         return;
     }
@@ -149,41 +151,57 @@ async Task HandleUpdate(ITelegramBotClient bot, Update update, CancellationToken
             })
             { ResizeKeyboard = true };
 
-            await bot.SendTextMessageAsync(id, "Выбери режим:", replyMarkup: kb);
+            await bot.SendTextMessageAsync(id,
+                "👋 <b>Привет!</b>\n\n" +
+                "Я буду присылать тебе уведомления 📨\n\n" +
+                "Выбери режим работы:");
         }
         else if (msg == "📢 Все")
         {
             users[id] = "all";
-            await bot.SendTextMessageAsync(id, "Включены все уведомления");
+            await bot.SendTextMessageAsync(id,
+                "📢 <b>Включены все уведомления</b>\n" +
+                "Ты будешь получать всё подряд");
         }
         else if (msg == "🚿 Коммуналка")
         {
             users[id] = "communal";
-            await bot.SendTextMessageAsync(id, "Только коммуналка");
+            await bot.SendTextMessageAsync(id,
+                "🚿 <b>Режим коммуналки включён</b>\n\n" +
+                "Будут приходить только сообщения про:\n" +
+                "💧 воду\n⚡ свет\n🔥 газ\n🛠 отключения");
         }
         else if (msg == "❌ Выкл")
         {
             users[id] = "off";
-            await bot.SendTextMessageAsync(id, "Уведомления выключены");
+            await bot.SendTextMessageAsync(id,
+                "❌ <b>Уведомления отключены</b>\n\n" +
+                "Если захочешь вернуть — просто выбери режим");
         }
         else if (msg == "➕ Добавить источник")
         {
             await bot.SendTextMessageAsync(id,
-                "Отправь ссылку на сайт или канал");
+                "➕ <b>Добавление источника</b>\n\n" +
+                "Отправь ссылку:\n" +
+                "🌐 сайт (https://...)\n" +
+                "📢 Telegram-канал");
         }
         else if (msg.StartsWith("http"))
         {
             userSources[id].Add(msg);
-            await bot.SendTextMessageAsync(id, "Источник добавлен");
+            await bot.SendTextMessageAsync(id,
+                "✅ <b>Источник добавлен!</b>\n" +
+                "Теперь я буду его отслеживать");
         }
         else if (msg == "📂 Мои источники")
         {
             var list = string.Join("\n", userSources[id]);
 
             if (string.IsNullOrEmpty(list))
-                list = "Пусто";
+                list = "📭 Список пуст";
 
-            await bot.SendTextMessageAsync(id, list);
+            await bot.SendTextMessageAsync(id,
+                "📂 <b>Твои источники:</b>\n\n" + list);
         }
     }
 }

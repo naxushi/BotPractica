@@ -154,7 +154,7 @@ async Task HandleUpdate(ITelegramBotClient bot, Update update, CancellationToken
             await bot.SendTextMessageAsync(id,
                 "Отправь ссылку:\n\n" +
                 "- сайт (https://...)\n" +
-                "- канал (бот должен быть админом)");
+                "- канал ");
         }
         else if (msg.StartsWith("http"))
         {

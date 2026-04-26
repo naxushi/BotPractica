@@ -6,20 +6,24 @@ using Telegram.Bot.Types.ReplyMarkups;
 using System.Net;
 using System.Text;
 
-var botToken = Environment.GetEnvironmentVariable("BOT_TOKEN");
+var token = Environment.GetEnvironmentVariable("BOT_TOKEN");
 
-if (string.IsNullOrEmpty(botToken))
+if (string.IsNullOrEmpty(token))
 {
-    Console.WriteLine("Token not found");
+    Console.WriteLine("NO TOKEN");
     return;
 }
 
-var bot = new TelegramBotClient(botToken);
+var bot = new TelegramBotClient(token);
 
-// хранение режима пользователя
-var usersMode = new Dictionary<long, string>();
+// ===== данные пользователей
+var users = new Dictionary<long, string>(); // режим
+var userSources = new Dictionary<long, List<string>>(); // источники
 
-// мини сервер для Render (чтобы не ругался на порт)
+var http = new HttpClient();
+var lastData = new Dictionary<string, string>(); // анти-дубли
+
+// ===== Render фикс
 _ = Task.Run(() =>
 {
     var listener = new HttpListener();
@@ -29,96 +33,165 @@ _ = Task.Run(() =>
     while (true)
     {
         var ctx = listener.GetContext();
-        var response = ctx.Response;
-        var buffer = Encoding.UTF8.GetBytes("Bot is running");
-        response.OutputStream.Write(buffer, 0, buffer.Length);
-        response.Close();
+        var res = ctx.Response;
+        var buf = Encoding.UTF8.GetBytes("ok");
+        res.OutputStream.Write(buf, 0, buf.Length);
+        res.Close();
     }
 });
 
+// ===== ПАРСИНГ САЙТОВ
+_ = Task.Run(async () =>
+{
+    while (true)
+    {
+        try
+        {
+            foreach (var user in userSources)
+            {
+                foreach (var source in user.Value)
+                {
+                    if (!source.StartsWith("http")) continue;
+
+                    var html = await http.GetStringAsync(source);
+
+                    if (!lastData.ContainsKey(source) || lastData[source] != html)
+                    {
+                        lastData[source] = html;
+
+                        if (!IsCommunal(html)) continue;
+
+                        if (users[user.Key] == "off") continue;
+
+                        await bot.SendTextMessageAsync(user.Key,
+                            "🌐 Сайт:\n\n" +
+                            html.Substring(0, Math.Min(300, html.Length)));
+                    }
+                }
+            }
+        }
+        catch { }
+
+        await Task.Delay(60000);
+    }
+});
+
+// ===== TELEGRAM
 using var cts = new CancellationTokenSource();
 
 bot.StartReceiving(
-    HandleUpdateAsync,
-    HandleErrorAsync,
+    HandleUpdate,
+    HandleError,
     new ReceiverOptions(),
     cancellationToken: cts.Token
 );
 
-Console.WriteLine("Бот запущен");
+Console.WriteLine("BOT STARTED");
 
 await Task.Delay(-1);
 
-// =========================
-// ОБРАБОТКА СООБЩЕНИЙ
-// =========================
-
-async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
+// ===== ОБРАБОТКА
+async Task HandleUpdate(ITelegramBotClient bot, Update update, CancellationToken ct)
 {
-    if (update.Message is { Text: { } text })
+    // 📢 КАНАЛ
+    if (update.ChannelPost is { Text: { } text })
     {
-        var chatId = update.Message.Chat.Id;
-
-        if (text == "/start")
+        foreach (var user in users)
         {
-            var keyboard = new ReplyKeyboardMarkup(new[]
+            if (user.Value == "off") continue;
+
+            if (user.Value == "communal" && !IsCommunal(text))
+                continue;
+
+            await bot.SendTextMessageAsync(user.Key,
+                "📢 Канал:\n\n" + text);
+        }
+
+        return;
+    }
+
+    // 👤 ПОЛЬЗОВАТЕЛЬ
+    if (update.Message is { Text: { } msg })
+    {
+        var id = update.Message.Chat.Id;
+
+        if (!userSources.ContainsKey(id))
+            userSources[id] = new List<string>();
+
+        if (msg == "/start")
+        {
+            users[id] = "all";
+
+            var kb = new ReplyKeyboardMarkup(new[]
             {
-                new[] { new KeyboardButton("📢 Все новости") },
-                new[] { new KeyboardButton("🚿 Только коммунальные") },
-                new[] { new KeyboardButton("❌ Выключить") }
+                new[] { new KeyboardButton("📢 Все") },
+                new[] { new KeyboardButton("🚿 Коммуналка") },
+                new[] { new KeyboardButton("➕ Добавить источник") },
+                new[] { new KeyboardButton("📂 Мои источники") },
+                new[] { new KeyboardButton("❌ Выкл") }
             })
-            {
-                ResizeKeyboard = true
-            };
+            { ResizeKeyboard = true };
 
-            await bot.SendTextMessageAsync(chatId,
-                "Выбери режим:",
-                replyMarkup: keyboard);
+            await bot.SendTextMessageAsync(id, "Выбери:", replyMarkup: kb);
+        }
+        else if (msg == "📢 Все")
+        {
+            users[id] = "all";
+            await bot.SendTextMessageAsync(id, "Все уведомления включены");
+        }
+        else if (msg == "🚿 Коммуналка")
+        {
+            users[id] = "communal";
+            await bot.SendTextMessageAsync(id, "Только коммуналка");
+        }
+        else if (msg == "❌ Выкл")
+        {
+            users[id] = "off";
+            await bot.SendTextMessageAsync(id, "Выключено");
+        }
+        else if (msg == "➕ Добавить источник")
+        {
+            await bot.SendTextMessageAsync(id,
+                "Отправь ссылку:\n\n" +
+                "- сайт (https://...)\n" +
+                "- канал (бот должен быть админом)");
+        }
+        else if (msg.StartsWith("http"))
+        {
+            userSources[id].Add(msg);
+            await bot.SendTextMessageAsync(id, "Источник добавлен");
+        }
+        else if (msg == "📂 Мои источники")
+        {
+            var list = string.Join("\n", userSources[id]);
 
-            return;
-        }
+            if (string.IsNullOrEmpty(list))
+                list = "Пусто";
 
-        if (text == "📢 Все новости")
-        {
-            usersMode[chatId] = "all";
-            await bot.SendTextMessageAsync(chatId, "Теперь будут приходить ВСЕ новости");
-        }
-        else if (text == "🚿 Только коммунальные")
-        {
-            usersMode[chatId] = "communal";
-            await bot.SendTextMessageAsync(chatId, "Теперь только коммунальные уведомления");
-        }
-        else if (text == "❌ Выключить")
-        {
-            usersMode[chatId] = "off";
-            await bot.SendTextMessageAsync(chatId, "Уведомления выключены");
+            await bot.SendTextMessageAsync(id, list);
         }
     }
 }
 
-// =========================
-// ФИЛЬТР КОММУНАЛКИ
-// =========================
-
+// ===== ФИЛЬТР
 bool IsCommunal(string text)
 {
-    var keywords = new[]
+    var words = new[]
     {
         "вода",
         "свет",
         "газ",
-        "отключение",
+        "отключ",
         "ремонт",
-        "коммун"
+        "авар"
     };
 
-    return keywords.Any(k => text.ToLower().Contains(k));
+    return words.Any(w => text.ToLower().Contains(w));
 }
 
-// =========================
-
-Task HandleErrorAsync(ITelegramBotClient bot, Exception exception, CancellationToken ct)
+// ===== ОШИБКИ
+Task HandleError(ITelegramBotClient bot, Exception ex, CancellationToken ct)
 {
-    Console.WriteLine(exception.Message);
+    Console.WriteLine(ex.Message);
     return Task.CompletedTask;
 }

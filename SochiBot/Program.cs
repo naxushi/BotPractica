@@ -39,7 +39,7 @@ async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, Cancellation
 
         if (messageText == "/start")
         {
-            await bot.SendMessage(chatId, "Бот работает");
+            await bot.SendTextMessageAsync(chatId, "Бот работает");
         }
     }
 }

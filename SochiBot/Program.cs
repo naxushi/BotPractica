@@ -16,18 +16,23 @@ if (string.IsNullOrEmpty(token))
 
 var bot = new TelegramBotClient(token);
 
-// ===== данные пользователей
+// ===== пользователи
 var users = new Dictionary<long, string>(); // режим
-var userSources = new Dictionary<long, List<string>>{
-    "https://rosseti-kuban.ru/potrebitelyam/tekhnicheskoe-sostoyanie-setey/planovye-otklyucheniya/",
-    "https://sochi.com/news/2107/",
-    "https://t.me/mimimiandmanimo" 
-    }; // источники
+
+// ===== источники (по умолчанию)
+var defaultSources = new List<string>
+{
+    "https://sochi.com/news/",
+    "https://rosseti-kuban.ru/"
+};
+
+// ===== источники пользователей
+var userSources = new Dictionary<long, List<string>>();
 
 var http = new HttpClient();
-var lastData = new Dictionary<string, string>(); // анти-дубли
+var lastData = new Dictionary<string, string>();
 
-// ===== Render фикс
+// ===== Render фикс (порт)
 _ = Task.Run(() =>
 {
     var listener = new HttpListener();
@@ -53,6 +58,8 @@ _ = Task.Run(async () =>
         {
             foreach (var user in userSources)
             {
+                var id = user.Key;
+
                 foreach (var source in user.Value)
                 {
                     if (!source.StartsWith("http")) continue;
@@ -63,18 +70,23 @@ _ = Task.Run(async () =>
                     {
                         lastData[source] = html;
 
-                        if (!IsCommunal(html)) continue;
+                        if (users.ContainsKey(id) && users[id] == "off")
+                            continue;
 
-                        if (users[user.Key] == "off") continue;
+                        if (users.ContainsKey(id) && users[id] == "communal" && !IsCommunal(html))
+                            continue;
 
-                        await bot.SendTextMessageAsync(user.Key,
-                            "🌐 Сайт:\n\n" +
-                            html.Substring(0, Math.Min(300, html.Length)));
+                        await bot.SendTextMessageAsync(id,
+                            "🌐 Обновление с сайта:\n\n" +
+                            html.Substring(0, Math.Min(500, html.Length)));
                     }
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
 
         await Task.Delay(60000);
     }
@@ -110,7 +122,6 @@ async Task HandleUpdate(ITelegramBotClient bot, Update update, CancellationToken
             await bot.SendTextMessageAsync(user.Key,
                 "📢 Канал:\n\n" + text);
         }
-
         return;
     }
 
@@ -119,13 +130,15 @@ async Task HandleUpdate(ITelegramBotClient bot, Update update, CancellationToken
     {
         var id = update.Message.Chat.Id;
 
+        // если первый раз
         if (!userSources.ContainsKey(id))
-            userSources[id] = new List<string>();
+            userSources[id] = new List<string>(defaultSources);
+
+        if (!users.ContainsKey(id))
+            users[id] = "all";
 
         if (msg == "/start")
         {
-            users[id] = "all";
-
             var kb = new ReplyKeyboardMarkup(new[]
             {
                 new[] { new KeyboardButton("📢 Все") },
@@ -136,12 +149,12 @@ async Task HandleUpdate(ITelegramBotClient bot, Update update, CancellationToken
             })
             { ResizeKeyboard = true };
 
-            await bot.SendTextMessageAsync(id, "Выбери:", replyMarkup: kb);
+            await bot.SendTextMessageAsync(id, "Выбери режим:", replyMarkup: kb);
         }
         else if (msg == "📢 Все")
         {
             users[id] = "all";
-            await bot.SendTextMessageAsync(id, "Все уведомления включены");
+            await bot.SendTextMessageAsync(id, "Включены все уведомления");
         }
         else if (msg == "🚿 Коммуналка")
         {
@@ -151,14 +164,12 @@ async Task HandleUpdate(ITelegramBotClient bot, Update update, CancellationToken
         else if (msg == "❌ Выкл")
         {
             users[id] = "off";
-            await bot.SendTextMessageAsync(id, "Выключено");
+            await bot.SendTextMessageAsync(id, "Уведомления выключены");
         }
         else if (msg == "➕ Добавить источник")
         {
             await bot.SendTextMessageAsync(id,
-                "Отправь ссылку:\n\n" +
-                "- сайт (https://...)\n" +
-                "- канал ");
+                "Отправь ссылку на сайт или канал");
         }
         else if (msg.StartsWith("http"))
         {

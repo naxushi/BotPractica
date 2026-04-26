@@ -3,6 +3,8 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
+using System.Net;
+using System.Text;
 
 var botToken = Environment.GetEnvironmentVariable("BOT_TOKEN");
 
@@ -14,7 +16,25 @@ if (string.IsNullOrEmpty(botToken))
 
 var bot = new TelegramBotClient(botToken);
 
-var usersMode = new Dictionary<long, string>(); // хранит режим пользователя
+// хранение режима пользователя
+var usersMode = new Dictionary<long, string>();
+
+// мини сервер для Render (чтобы не ругался на порт)
+_ = Task.Run(() =>
+{
+    var listener = new HttpListener();
+    listener.Prefixes.Add("http://*:10000/");
+    listener.Start();
+
+    while (true)
+    {
+        var ctx = listener.GetContext();
+        var response = ctx.Response;
+        var buffer = Encoding.UTF8.GetBytes("Bot is running");
+        response.OutputStream.Write(buffer, 0, buffer.Length);
+        response.Close();
+    }
+});
 
 using var cts = new CancellationTokenSource();
 
@@ -29,6 +49,9 @@ Console.WriteLine("Бот запущен");
 
 await Task.Delay(-1);
 
+// =========================
+// ОБРАБОТКА СООБЩЕНИЙ
+// =========================
 
 async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
 {
@@ -55,7 +78,6 @@ async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, Cancellation
             return;
         }
 
-        // выбор режима
         if (text == "📢 Все новости")
         {
             usersMode[chatId] = "all";
@@ -73,6 +95,27 @@ async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, Cancellation
         }
     }
 }
+
+// =========================
+// ФИЛЬТР КОММУНАЛКИ
+// =========================
+
+bool IsCommunal(string text)
+{
+    var keywords = new[]
+    {
+        "вода",
+        "свет",
+        "газ",
+        "отключение",
+        "ремонт",
+        "коммун"
+    };
+
+    return keywords.Any(k => text.ToLower().Contains(k));
+}
+
+// =========================
 
 Task HandleErrorAsync(ITelegramBotClient bot, Exception exception, CancellationToken ct)
 {
